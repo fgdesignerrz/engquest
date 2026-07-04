@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EngQuest — Roguelike de Inglês</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   ENGQUEST — Roguelike + Gacha de Inglês
+   Paleta: noite profunda #0d0b1a / painel #1a1730 / tocha #ffb545
+   Raridades: comum cinza, raro azul, épico roxo, lendário dourado,
+   místico rosa-arco-íris (animado)
+   ============================================================ */
+:root{
+  --bg:#0d0b1a; --bg2:#141126; --panel:#1a1730; --panel2:#221d40;
+  --line:#3a3560; --line2:#565092;
+  --ink:#e8e4ff; --ink-dim:#9a94c2;
+  --torch:#ffb545; --hp:#ff5a6e; --hp2:#67e06a; --xp:#5ad4ff; --gold:#ffd23c;
+  --ok:#67e06a; --warn:#ffb545; --bad:#ff5a6e;
+  --r-comum:#9aa0b0; --r-raro:#4da6ff; --r-epico:#b478ff;
+  --r-lendario:#ffc93c; --r-mistico:#ff4dd8;
+  --px:3px;
+}
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Press Start 2P','Courier New',monospace;
+  font-size:11px; line-height:1.7;
+  image-rendering:pixelated; overflow:hidden;
+  user-select:none;
+}
+body::after{ /* scanlines sutis */
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:99;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px);
+  opacity:.5;
+}
+canvas{image-rendering:pixelated;}
+button{font-family:inherit;}
+input{font-family:inherit;}
+
+/* ---- borda pixelada (degraus) ---- */
+.pxbox{
+  background:var(--panel); position:relative;
+  box-shadow:
+    0 calc(-1*var(--px)) 0 0 var(--line), 0 var(--px) 0 0 var(--line),
+    calc(-1*var(--px)) 0 0 0 var(--line), var(--px) 0 0 0 var(--line);
+  margin:var(--px);
+}
+
+/* ---- app frame ---- */
+#app{max-width:520px; height:100dvh; margin:0 auto; display:flex; flex-direction:column; position:relative; overflow:hidden;}
+.screen{display:none; flex-direction:column; height:100%; overflow:hidden;}
+.screen.on{display:flex;}
+
+/* ============ TÍTULO ============ */
+#scr-title{align-items:center; justify-content:center; gap:18px; text-align:center; padding:20px;
+  background:radial-gradient(ellipse at 50% 20%, #241d4d 0%, var(--bg) 65%);}
+.logo{font-size:26px; letter-spacing:2px; line-height:1.4;
+  color:var(--torch); text-shadow:0 4px 0 #7a3d00, 0 0 24px rgba(255,181,69,.45);
+  animation:float 3s ease-in-out infinite;}
+.logo em{font-style:normal; color:var(--xp); text-shadow:0 4px 0 #114a66,0 0 24px rgba(90,212,255,.4);}
+.tagline{color:var(--ink-dim); font-size:9px;}
+.title-stats{width:100%; max-width:360px; padding:14px; font-size:8px; text-align:left; color:var(--ink-dim);}
+.title-stats h3{color:var(--torch); font-size:9px; margin-bottom:8px;}
+.title-stats .row{display:flex; justify-content:space-between; margin:4px 0;}
+.title-stats .row b{color:var(--ink);}
+
+/* ============ BOTÕES ============ */
+.btn{
+  display:inline-block; cursor:pointer; border:0; color:#1a1200;
+  background:var(--torch); padding:12px 18px; font-size:11px;
+  box-shadow:0 calc(-1*var(--px)) 0 0 #ffd98d, 0 var(--px) 0 0 #a35f00,
+    calc(-1*var(--px)) 0 0 0 #c98524, var(--px) 0 0 0 #c98524,
+    0 calc(2*var(--px)) 0 0 #5c3400;
+  transition:transform .06s;
+}
+.btn:active{transform:translateY(var(--px)); box-shadow:0 calc(-1*var(--px)) 0 0 #ffd98d, 0 var(--px) 0 0 #a35f00, calc(-1*var(--px)) 0 0 0 #c98524, var(--px) 0 0 0 #c98524;}
+.btn.blue{background:var(--xp); color:#00202e; box-shadow:0 calc(-1*var(--px)) 0 0 #b3ecff,0 var(--px) 0 0 #1c6f8f, calc(-1*var(--px)) 0 0 0 #3596bd, var(--px) 0 0 0 #3596bd, 0 calc(2*var(--px)) 0 0 #0d3c50;}
+.btn.ghost{background:var(--panel2); color:var(--ink); box-shadow:0 calc(-1*var(--px)) 0 0 var(--line2),0 var(--px) 0 0 #100d22, calc(-1*var(--px)) 0 0 0 var(--line), var(--px) 0 0 0 var(--line), 0 calc(2*var(--px)) 0 0 #0a0816;}
+.btn.small{padding:8px 10px; font-size:8px;}
+.btn:disabled{opacity:.4; pointer-events:none;}
+
+/* ============ HUD ============ */
+#hud{display:flex; flex-wrap:wrap; gap:6px; padding:8px 10px 4px; justify-content:center;}
+.chip{font-size:8px; padding:6px 8px; background:var(--panel); display:flex; align-items:center; gap:5px;
+  box-shadow:0 -2px 0 0 var(--line),0 2px 0 0 var(--line),-2px 0 0 0 var(--line),2px 0 0 0 var(--line); margin:2px;}
+.chip b{font-size:9px;}
+.chip.gold b{color:var(--gold);} .chip.xp b{color:var(--xp);}
+.chip.floor b{color:var(--torch);} .chip.combo b{color:var(--r-epico);}
+.chip.combo.hot{animation:glowPulse 1s infinite; color:var(--r-lendario);}
+
+/* ============ ARENA ============ */
+#arena{position:relative; height:172px; margin:6px 10px 2px; overflow:hidden;
+  background:linear-gradient(#181433 0%, #221b45 55%, #17122e 56%, #100d22 100%);
+  box-shadow:0 -3px 0 0 var(--line),0 3px 0 0 var(--line),-3px 0 0 0 var(--line),3px 0 0 0 var(--line);}
+#arena .torch{position:absolute; top:12px; width:8px; height:14px; background:var(--torch);
+  box-shadow:0 0 18px 6px rgba(255,181,69,.25); animation:flick .35s steps(2) infinite alternate;}
+#arena .torch.l{left:16px;} #arena .torch.r{right:16px;}
+.fighter{position:absolute; bottom:26px; text-align:center; width:130px;}
+.fighter .name{font-size:7px; color:var(--ink-dim); margin-bottom:3px; white-space:nowrap; overflow:hidden;}
+.fighter.hero{left:8px;} .fighter.enemy{right:8px;}
+.fighter canvas{display:block; margin:0 auto;}
+.fighter.hero canvas{animation:idleHero 1.1s steps(2) infinite;}
+.fighter.enemy canvas{animation:idleFoe 1.3s steps(2) infinite;}
+.hpbar{height:10px; background:#0a0816; margin-top:4px; position:relative;
+  box-shadow:0 -2px 0 0 var(--line),0 2px 0 0 var(--line),-2px 0 0 0 var(--line),2px 0 0 0 var(--line);}
+.hpbar i{display:block; height:100%; background:var(--hp2); transition:width .25s steps(8);}
+.fighter.enemy .hpbar i{background:var(--hp);}
+.hpbar span{position:absolute; inset:0; font-size:7px; text-align:center; line-height:10px; color:#fff; text-shadow:1px 1px 0 #000;}
+.boss-tag{position:absolute; top:8px; left:50%; transform:translateX(-50%); color:var(--hp);
+  font-size:10px; text-shadow:0 0 12px rgba(255,90,110,.8); animation:glowPulse .8s infinite;}
+.dmgfloat{position:absolute; font-size:12px; font-weight:bold; pointer-events:none; animation:dmgUp .8s forwards; text-shadow:2px 2px 0 #000; z-index:5;}
+.hitflash{animation:hitFlash .25s steps(2) 2 !important;}
+
+/* ============ PAINEL DE PERGUNTA ============ */
+/* #panel é um contêiner de rolagem em bloco. Como flex-column, o filho único
+   era dimensionado ao espaço livre e o conteúdo alto (feedback de acerto parcial)
+   ficava cortado sem rolagem, deixando o botão CONTINUAR inacessível. */
+#panel{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 10px 12px;}
+#panel #qarea{margin-bottom:8px;}
+.qcard{padding:12px;}
+.qtier{font-size:7px; color:var(--xp); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;}
+.qtier .rev{color:var(--r-epico);}
+.qtext{font-size:11px; line-height:1.9; color:var(--ink); margin-bottom:10px;}
+.qtext .dialog{display:block; color:var(--ink-dim); font-size:9px; margin-bottom:6px;}
+#answer{width:100%; background:#0a0816; border:0; color:var(--ink); padding:12px; font-size:11px;
+  box-shadow:0 -3px 0 0 var(--line),0 3px 0 0 var(--line),-3px 0 0 0 var(--line),3px 0 0 0 var(--line); margin:3px 0 10px;}
+#answer:focus{outline:none; box-shadow:0 -3px 0 0 var(--xp),0 3px 0 0 var(--xp),-3px 0 0 0 var(--xp),3px 0 0 0 var(--xp);}
+.qactions{display:flex; gap:10px; flex-wrap:wrap;}
+
+/* ---- loja rápida ---- */
+#shop{display:flex; gap:6px; flex-wrap:wrap; justify-content:center;}
+#shop .btn{flex:1; min-width:100px;}
+
+/* ============ FEEDBACK ============ */
+.fb{padding:12px; animation:slideUp .25s;}
+.fb .head{font-size:12px; margin-bottom:8px;}
+.fb.ok .head{color:var(--ok);} .fb.partial .head{color:var(--warn);} .fb.bad .head{color:var(--bad);}
+.fb .pct{font-size:20px; margin:4px 0 10px;}
+.fb .line{font-size:9px; color:var(--ink-dim); margin:7px 0; line-height:1.8;}
+.fb .line b{color:var(--ink);}
+.fb .wordok{color:var(--ok);} .fb .wordbad{color:var(--bad); text-decoration:line-through;}
+.fb .wordmiss{color:var(--warn);}
+.fb .rewards{display:flex; gap:10px; margin:10px 0; font-size:9px; flex-wrap:wrap;}
+.fb .rewards span{animation:pop .3s;}
+
+/* ============ MODAIS ============ */
+.overlay{position:absolute; inset:0; background:rgba(6,4,14,.86); z-index:20;
+  display:none; align-items:center; justify-content:center; padding:16px;}
+.overlay.on{display:flex;}
+.modal{width:100%; max-width:360px; padding:18px; text-align:center; animation:slideUp .22s; max-height:92%; overflow-y:auto;}
+.modal h2{font-size:12px; margin-bottom:12px; color:var(--torch);}
+
+/* ---- pacote ---- */
+.packwrap{padding:26px 0 12px;}
+.pack{width:92px; height:92px; margin:0 auto 14px; position:relative; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-size:30px;
+  animation:packShake .5s ease-in-out infinite;}
+.pack::before{content:""; position:absolute; inset:0; background:var(--pc,#666);
+  box-shadow:0 -4px 0 0 var(--pcl,#999),0 4px 0 0 var(--pcd,#333),-4px 0 0 0 var(--pcd,#333),4px 0 0 0 var(--pcl,#999);}
+.pack::after{content:""; position:absolute; left:0; right:0; top:38px; height:14px; background:var(--pcd,#333);}
+.pack span{position:relative; z-index:2; text-shadow:2px 2px 0 #000;}
+.pack.opening{animation:packBurst .45s forwards;}
+.packname{font-size:10px; margin-bottom:6px;}
+.packhint{font-size:8px; color:var(--ink-dim);}
+
+/* ---- carta de item ---- */
+.itemcard{padding:16px; margin:6px auto; max-width:280px; position:relative; animation:pop .35s;}
+.itemcard .rar{font-size:8px; letter-spacing:1px; margin-bottom:8px;}
+.itemcard canvas{margin:6px auto; display:block; filter:drop-shadow(0 0 10px var(--rc,transparent));}
+.itemcard .iname{font-size:11px; margin:8px 0; line-height:1.6;}
+.itemcard .istats{font-size:9px; color:var(--ink-dim); display:flex; gap:14px; justify-content:center; margin-bottom:6px;}
+.itemcard .istats b{color:var(--ink);}
+.itemcard .cmp{font-size:8px; margin:6px 0;}
+.cmp .up{color:var(--ok);} .cmp .down{color:var(--bad);} .cmp .eq{color:var(--ink-dim);}
+.r-comum{color:var(--r-comum); --rc:var(--r-comum);}
+.r-raro{color:var(--r-raro); --rc:var(--r-raro);}
+.r-epico{color:var(--r-epico); --rc:var(--r-epico);}
+.r-lendario{color:var(--r-lendario); --rc:var(--r-lendario);}
+.r-mistico{--rc:var(--r-mistico); animation:rainbowTx 1.4s linear infinite;}
+.itemcard.mistico{animation:pop .35s, mysticGlow 1.6s linear infinite;}
+.flash{position:fixed; inset:0; z-index:60; pointer-events:none; opacity:0;}
+.flash.go{animation:whiteFlash .5s;}
+#app.quake{animation:quake .45s;}
+
+/* partículas */
+.part{position:absolute; width:6px; height:6px; z-index:65; pointer-events:none; animation:partFly .9s forwards;}
+
+/* ---- inventário ---- */
+#invgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:10px 0;}
+.slot{padding:6px 2px; font-size:6px; color:var(--ink-dim); text-align:center; min-height:64px;}
+.slot canvas{display:block; margin:2px auto;}
+.slot .sn{font-size:6px; line-height:1.4;}
+.slot.empty{opacity:.35;}
+.invtotal{font-size:9px; display:flex; justify-content:center; gap:16px; margin-top:8px;}
+
+/* ---- reviver / fim ---- */
+.skullbig{font-size:40px; margin:8px 0; animation:float 2s infinite;}
+.sumrow{display:flex; justify-content:space-between; font-size:9px; margin:6px 0; color:var(--ink-dim);}
+.sumrow b{color:var(--ink);}
+
+/* toast */
+#toast{position:absolute; top:12px; left:50%; transform:translateX(-50%); z-index:70; font-size:9px;
+  background:var(--panel2); padding:10px 14px; display:none;
+  box-shadow:0 -3px 0 0 var(--line2),0 3px 0 0 var(--line2),-3px 0 0 0 var(--line2),3px 0 0 0 var(--line2);}
+#toast.on{display:block; animation:slideUp .2s;}
+
+/* ============ ANIMAÇÕES ============ */
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes flick{from{opacity:.7; height:12px}to{opacity:1; height:16px}}
+@keyframes idleHero{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes idleFoe{0%,100%{transform:translateY(0) scaleX(-1)}50%{transform:translateY(-4px) scaleX(-1)}}
+@keyframes glowPulse{0%,100%{filter:brightness(1)}50%{filter:brightness(1.6)}}
+@keyframes dmgUp{0%{opacity:1; transform:translateY(0)}100%{opacity:0; transform:translateY(-34px)}}
+@keyframes hitFlash{0%{filter:brightness(3) saturate(0)}100%{filter:none}}
+@keyframes slideUp{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+@keyframes pop{0%{transform:scale(.4); opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1); opacity:1}}
+@keyframes packShake{0%,100%{transform:rotate(0)}20%{transform:rotate(-4deg)}60%{transform:rotate(4deg)}}
+@keyframes packBurst{0%{transform:scale(1)}60%{transform:scale(1.25)}100%{transform:scale(0); opacity:0}}
+@keyframes rainbowTx{0%{color:#ff4dd8}25%{color:#ffc93c}50%{color:#5ad4ff}75%{color:#b478ff}100%{color:#ff4dd8}}
+@keyframes mysticGlow{0%{box-shadow:0 0 24px 4px rgba(255,77,216,.6)}33%{box-shadow:0 0 24px 4px rgba(90,212,255,.6)}66%{box-shadow:0 0 24px 4px rgba(255,201,60,.6)}100%{box-shadow:0 0 24px 4px rgba(255,77,216,.6)}}
+@keyframes whiteFlash{0%{opacity:0; background:#fff}20%{opacity:.95; background:#fff}100%{opacity:0}}
+@keyframes quake{0%,100%{transform:translate(0)}20%{transform:translate(-6px,4px)}40%{transform:translate(6px,-4px)}60%{transform:translate(-4px,-3px)}80%{transform:translate(4px,3px)}}
+@keyframes partFly{0%{opacity:1; transform:translate(0,0)}100%{opacity:0; transform:translate(var(--dx),var(--dy)) rotate(300deg)}}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001s !important; animation-iteration-count:1 !important; transition:none !important;}
+}
+@media (max-width:380px){ body{font-size:10px;} .logo{font-size:20px;} }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TELA: TÍTULO ============ -->
+  <div class="screen on" id="scr-title">
+    <div class="logo">ENG<em>QUEST</em></div>
+    <div class="tagline">⚔️ Responda. Evolua. Sobreviva. 📦</div>
+    <div class="tagline" style="color:var(--line2)">Roguelike + Gacha de Inglês</div>
+    <button class="btn" id="btn-start" style="font-size:13px; padding:16px 26px;">▶ INICIAR RUN</button>
+    <div class="title-stats pxbox" id="meta-stats"></div>
+  </div>
+
+  <!-- ============ TELA: JOGO ============ -->
+  <div class="screen" id="scr-game">
+    <div id="hud">
+      <div class="chip floor" id="chip-floor"></div>
+      <div class="chip gold" id="chip-gold"></div>
+      <div class="chip xp" id="chip-xp"></div>
+      <div class="chip combo" id="chip-combo"></div>
+      <button class="btn ghost small" id="btn-inv">🎒</button>
+    </div>
+
+    <div id="arena">
+      <div class="torch l"></div><div class="torch r"></div>
+      <div class="boss-tag" id="boss-tag" style="display:none">☠ BOSS ☠</div>
+      <div class="fighter hero">
+        <div class="name" id="hero-name">Herói</div>
+        <canvas id="hero-cv"></canvas>
+        <div class="hpbar"><i id="hero-hp-i"></i><span id="hero-hp-t"></span></div>
+      </div>
+      <div class="fighter enemy">
+        <div class="name" id="enemy-name"></div>
+        <canvas id="enemy-cv"></canvas>
+        <div class="hpbar"><i id="enemy-hp-i"></i><span id="enemy-hp-t"></span></div>
+      </div>
+    </div>
+
+    <div id="panel">
+      <div id="qarea"></div>
+      <div id="shop">
+        <button class="btn ghost small" id="shop-heal">❤️ Curar 50%<br>40🪙</button>
+        <button class="btn ghost small" id="shop-pack">📦 Pacote extra<br>55🪙</button>
+        <button class="btn ghost small" id="shop-crit">💥 +10% Crítico<br>60🪙</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ TELA: RESUMO ============ -->
+  <div class="screen" id="scr-summary">
+    <div style="flex:1; overflow-y:auto; padding:20px; text-align:center;" id="sum-content"></div>
+    <div style="display:flex; gap:10px; padding:14px; justify-content:center;">
+      <button class="btn" id="btn-again">🔄 NOVA RUN</button>
+      <button class="btn ghost" id="btn-title">🏠 MENU</button>
+    </div>
+  </div>
+
+  <!-- overlay genérico (pacotes, itens, inventário, reviver) -->
+  <div class="overlay" id="ovl"><div class="modal pxbox" id="modal"></div></div>
+  <div id="toast"></div>
+  <div class="flash" id="flash"></div>
+</div>
+
+<script>
+/* ============================================================
+   ENGQUEST — DATA LAYER
+   Tudo que é conteúdo/balanceamento vive aqui.
+   Para escalar o jogo: adicione entradas nestas tabelas,
+   nenhuma mudança de lógica é necessária.
+   ============================================================ */
+"use strict";
+
+/* ---------------- CONFIG DE BALANCEAMENTO ---------------- */
+const CFG = {
+  player:{ baseHp:60, baseDmg:6, healOnCorrect:0.08, reviveHp:0.30 },
+  level:{ xpPerLevel:50, hpPerLevel:6, dmgPerLevel:1 },
+  enemy:{ hp:(f)=>18+f*8, dmg:(f)=>3+Math.floor(f*1.4), bossMult:2.0, bossEvery:5 },
+  reward:{ xp:(t)=>t*10, gold:(t)=>6+t*7, partialMult:0.5 },
+  score:{ full:0.95, partial:0.40 },
+  shop:{ heal:{cost:40,label:"Curar 50%"}, pack:{cost:55,label:"Pacote extra"},
+         crit:{cost:60,label:"+10% Crítico"}, reroll:{cost:30,label:"Rerrolar"} },
+  combo:[ {at:5, rareBonus:10, txt:"+10% chance rara"},
+          {at:10, rareBonus:20, txt:"+20% chance rara"},
+          {at:20, minPack:1, txt:"Pacote Raro garantido"},
+          {at:30, minPack:2, txt:"Pacote Épico garantido"} ],
+  srs:{ gaps:[3,5,8] },       // repetição espaçada: volta após N perguntas
+  learnedAfter:2,             // acertos p/ marcar palavra como aprendida
+};
+
+/* ---------------- RARIDADES E PACOTES ---------------- */
+const RARITIES = [
+  { key:"comum",    name:"COMUM",    mult:1.0, sell:8  },
+  { key:"raro",     name:"RARO",     mult:1.8, sell:18 },
+  { key:"epico",    name:"ÉPICO",    mult:3.0, sell:40 },
+  { key:"lendario", name:"LENDÁRIO", mult:5.0, sell:90 },
+  { key:"mistico",  name:"MÍSTICO",  mult:8.5, sell:220 },
+];
+const PACKS = [
+  { key:"comum",    name:"Pacote Comum",    col:"#8a90a0", odds:[70,25,4,1,0] },
+  { key:"raro",     name:"Pacote Raro",     col:"#4da6ff", odds:[0,50,35,14,1] },
+  { key:"epico",    name:"Pacote Épico",    col:"#b478ff", odds:[0,0,60,35,5] },
+  { key:"lendario", name:"Pacote Lendário", col:"#ffc93c", odds:[0,0,30,60,10] },
+];
+// tier da pergunta -> índice do pacote
+const PACK_BY_TIER = [0,0,0,1,1,2,2,2,3,3]; // idx 1..9
+
+/* ---------------- EQUIPAMENTOS ---------------- */
+// slot: arma | capacete | armadura | luvas | botas | escudo | anel | amuleto
+const ITEM_TYPES = [
+  { key:"espada",   nome:"Espada",   slot:"arma",     hp:0, dmg:4, sprite:"sword"  },
+  { key:"machado",  nome:"Machado",  slot:"arma",     hp:0, dmg:5, sprite:"axe"    },
+  { key:"arco",     nome:"Arco",     slot:"arma",     hp:0, dmg:4, sprite:"bow"    },
+  { key:"cajado",   nome:"Cajado",   slot:"arma",     hp:2, dmg:3, sprite:"staff"  },
+  { key:"adaga",    nome:"Adaga",    slot:"arma",     hp:0, dmg:3, sprite:"dagger" },
+  { key:"martelo",  nome:"Martelo",  slot:"arma",     hp:2, dmg:5, sprite:"hammer" },
+  { key:"capacete", nome:"Capacete", slot:"capacete", hp:5, dmg:0, sprite:"helm"   },
+  { key:"armadura", nome:"Armadura", slot:"armadura", hp:9, dmg:0, sprite:"armor"  },
+  { key:"luvas",    nome:"Luvas",    slot:"luvas",    hp:2, dmg:1, sprite:"gloves" },
+  { key:"botas",    nome:"Botas",    slot:"botas",    hp:3, dmg:1, sprite:"boots"  },
+  { key:"escudo",   nome:"Escudo",   slot:"escudo",   hp:7, dmg:0, sprite:"shield" },
+  { key:"anel",     nome:"Anel",     slot:"anel",     hp:2, dmg:2, sprite:"ring"   },
+  { key:"amuleto",  nome:"Amuleto",  slot:"amuleto",  hp:3, dmg:2, sprite:"amulet" },
+];
+const SLOTS = ["arma","capacete","armadura","luvas","botas","escudo","anel","amuleto"];
+const MATERIAL = { // prefixo do nome por raridade
+  comum:["de Madeira","Enferrujado(a)","Simples","Gasto(a)"],
+  raro:["de Ferro","de Aço","Polido(a)","do Soldado"],
+  epico:["Encantado(a)","Rúnico(a)","das Sombras","do Dragão"],
+  lendario:["Celestial","do Rei Caído","Flamejante","Ancestral"],
+  mistico:["do Vazio","das Estrelas","Primordial","do Infinito"],
+};
+
+/* ---------------- SPRITES (pixel art) ----------------
+   Metades espelhadas p/ personagens (simetria garantida).
+   Legenda: . transparente | o contorno | 1 cor base | 2 secundária | 3 destaque */
+function mirror(rows){ return rows.map(r=>r + r.split("").reverse().join("")); }
+
+const SPR = {
+  hero: mirror([
+    "....oo","...o33","..o331","..o333","...oo3","..o233",
+    ".o2233",".o2o33",".o2o33","..oo33","...o3o","...oo.",
+  ]),
+  slime: mirror([
+    "......","......","....oo","..oo11",".o1131",".o1111",
+    "o11122","o11111",".o1111","..oooo","......","......",
+  ]),
+  eye: mirror([
+    "......","...ooo","..o111","..o113",".o1133",".o1133",
+    "..o113","..o111","...ooo","......","......","......",
+  ]),
+  skull: mirror([
+    "..oooo",".o3333",".o3133",".o3333","..o333","..oo33",
+    ".o2333",".o2o33","..oo33","...o3o","...o3.","...oo.",
+  ]),
+  boss: mirror([
+    "o.....","oo..oo","o1o.o1","o11o11",".o1111",".o1311",
+    ".o1111","o11122","o11111",".o1o11","..o.o1","....oo",
+  ]),
+  /* ícones de itens (9 col) */
+  sword:["......o..",".....o1o.","....o1o..","...o1o...","..o1o....",".o1o.....","o2o......","o2oo.....",".oo......"],
+  axe:["..ooo....",".o111o...",".o11o2o..","..oo.o2o.",".....o2o.","....o2o..","...o2o...","..o2o....","..oo....."],
+  bow:["..oo.....",".o11o....","o1o.o....","o1o..2...","o1o...2..","o1o..2...","o1o.o....",".o11o....","..oo....."],
+  staff:["...ooo...","..o333o..","..o333o..","...ooo...","...o2o...","...o2o...","...o2o...","...o2o...","...oo...."],
+  dagger:[".........","....o....","...o1o...","...o1o...","...o1o...","..oo1oo..","...o2o...","...o2o...","....o...."],
+  hammer:[".ooooo...",".o111o...",".o111oo..",".ooooo...","...o2o...","...o2o...","...o2o...","...o2o...","...oo...."],
+  helm:["..ooooo..",".o11111o.",".o11111o.",".o1o1o1o.",".o11111o.","..o111o..","..oo.oo..",".........","........."],
+  armor:[".oo...oo.","o11o.o11o","o111o111o",".o11111o.",".o11311o.",".o11111o.","..o111o..","..ooooo..","........."],
+  gloves:["..ooo....",".o111o...",".o111o...","o11111o..","o11111o..",".o111o...",".oooo....",".........","........."],
+  boots:[".oo......",".o1o.....",".o1o.....",".o1oo....",".o111oo..",".o11111o.",".ooooooo.",".........","........."],
+  shield:[".ooooooo.","o1113111o","o1113111o","o1113111o",".o11311o.",".o11311o.","..o111o..","...o1o...","....o...."],
+  ring:["...o3o...","..oo1oo..",".o1o.o1o.",".o1...1o.",".o1...1o.","..o1.1o..","...o1o...",".........","........."],
+  amulet:[".o.....o.",".o.....o.","..o...o..","...o.o...","...o3o...","..o333o..","..o333o..","...ooo...","........."],
+};
+
+const ENEMIES = [
+  { name:"Slime",        spr:"slime", pal:{o:"#0c2a10","1":"#57d75b","2":"#0c2a10","3":"#eafff0"} },
+  { name:"Olho Maligno", spr:"eye",   pal:{o:"#2a0c33","1":"#c06cf0","2":"#2a0c33","3":"#ffdd55"} },
+  { name:"Esqueleto",    spr:"skull", pal:{o:"#1a1a24","1":"#8f93a8","2":"#5b5f75","3":"#e8e8f2"} },
+];
+const BOSS = { name:"Senhor da Masmorra", spr:"boss", pal:{o:"#33060b","1":"#e0434f","2":"#7d1622","3":"#ffd23c"} };
+const HERO_PAL = { o:"#0e2a33", "1":"#123a47", "2":"#3a6b7d", "3":"#5ad4ff" };
+
+/* ============================================================
+   BANCO DE PERGUNTAS — 9 tiers de dificuldade
+   Formato: p (enunciado PT) | a (respostas aceitas EN)
+            tr (tradução) | ex (exemplo) | note (explicação)
+   ============================================================ */
+function buildQuestions(){
+  const Q = [];
+  let seq = 0;
+  const add = (tier,p,a,tr,ex,note)=>Q.push({id:"q"+(seq++),tier,p,a,tr,ex,note});
+
+  /* ---- TIER 1: palavras isoladas ---- */
+  const t1 = {
+    "cor":[["vermelho","red"],["azul","blue"],["verde","green"],["amarelo","yellow"],
+      ["preto","black"],["branco","white"],["roxo","purple"],["laranja","orange"],
+      ["rosa","pink"],["marrom","brown"]],
+    "animal":[["cachorro","dog"],["gato","cat"],["pássaro","bird"],["cavalo","horse"],
+      ["peixe","fish"],["urso","bear"],["cobra","snake"],["lobo","wolf"],
+      ["raposa","fox"],["coelho","rabbit"]],
+    "objeto":[["espada","sword"],["escudo","shield"],["porta","door"],["chave","key"],
+      ["livro","book"],["cadeira","chair"],["mesa","table"],["janela","window"],
+      ["mapa","map"],["moeda","coin"]],
+    "número":[["três","three"],["cinco","five"],["sete","seven"],["nove","nine"],
+      ["dez","ten"],["doze","twelve"],["vinte","twenty"],["cem","one hundred","a hundred","hundred"]],
+  };
+  for(const cat in t1) for(const e of t1[cat]){
+    const [pt,...ans]=e;
+    add(1, `Como se diz "${pt}" em inglês? (${cat})`, ans,
+      `${pt} = ${ans[0]}`, `Ex.: "I see the ${ans[0]}."`,
+      `Vocabulário básico — categoria: ${cat}.`);
+  }
+
+  /* ---- TIER 2: frases curtas ---- */
+  const t2 = [
+    ["Eu gosto de café",["i like coffee"],"Presente simples: sujeito + verbo."],
+    ["Ela é minha amiga",["she is my friend"],"Verbo TO BE: she is."],
+    ["O gato está dormindo",["the cat is sleeping"],"Presente contínuo: is + verbo-ING."],
+    ["Nós estamos felizes",["we are happy"],"TO BE no plural: we are."],
+    ["Eu tenho um cachorro",["i have a dog"],"HAVE = ter. Artigo A antes de consoante."],
+    ["Ele corre rápido",["he runs fast"],"3ª pessoa: verbo ganha -S (runs)."],
+    ["A porta está aberta",["the door is open"],"OPEN aqui é adjetivo (aberta)."],
+    ["Eu quero água",["i want water"],"WANT = querer. Water não usa artigo aqui."],
+    ["Eles estão em casa",["they are at home","they are home"],"AT HOME = em casa."],
+    ["O livro é novo",["the book is new"],"Adjetivo vem depois do TO BE."],
+    ["Eu amo música",["i love music"],"LOVE = amar. Music sem artigo."],
+    ["Está frio hoje",["it is cold today"],"Clima usa IT: it is cold."],
+  ];
+  for(const [pt,ans,note] of t2)
+    add(2,`Traduza: "${pt}"`,ans,`${pt} = ${ans[0]}`,`Ex.: "${cap(ans[0])}."`,note);
+
+  /* ---- TIER 3: frases médias ---- */
+  const t3 = [
+    ["Eu vou ao mercado amanhã",["i will go to the market tomorrow","i am going to the market tomorrow"],"Futuro com WILL ou GOING TO."],
+    ["Meu irmão trabalha em um hospital",["my brother works in a hospital","my brother works at a hospital"],"3ª pessoa: works. IN/AT a hospital."],
+    ["Nós assistimos um filme ontem à noite",["we watched a movie last night"],"Passado: watched. LAST NIGHT = ontem à noite."],
+    ["Ela sempre bebe café de manhã",["she always drinks coffee in the morning"],"Advérbio ALWAYS antes do verbo."],
+    ["O cachorro está correndo no parque",["the dog is running in the park"],"Contínuo: is running. Dobra o N (run→running)."],
+    ["Eu preciso comprar sapatos novos",["i need to buy new shoes"],"NEED TO + verbo. Adjetivo antes do substantivo."],
+    ["Eles moram perto da praia",["they live near the beach","they live close to the beach"],"NEAR = perto de."],
+    ["Você pode me ajudar, por favor?",["can you help me please","could you help me please"],"CAN/COULD para pedidos."],
+    ["Estou aprendendo inglês todos os dias",["i am learning english every day"],"EVERY DAY (separado) = todos os dias."],
+    ["O restaurante abre às oito horas",["the restaurant opens at eight","the restaurant opens at eight o clock","the restaurant opens at 8"],"Horário usa AT: at eight."],
+  ];
+  for(const [pt,ans,note] of t3)
+    add(3,`Traduza: "${pt}"`,ans,`${pt} = ${ans[0]}`,`Ex.: "${cap(ans[0])}."`,note);
+
+  /* ---- TIER 4: tempos verbais ---- */
+  const t4 = [
+    ["Passado de GO: 'Yesterday I ___ to school'",["went"],"go → went (irregular)","Yesterday I went to school."],
+    ["Passado de EAT",["ate"],"eat → ate → eaten","She ate pizza last night."],
+    ["Particípio de SEE (I have ___)",["seen"],"see → saw → seen","I have seen this movie."],
+    ["Traduza: 'Eu viajarei' (futuro)",["i will travel"],"WILL + verbo no infinitivo","I will travel next year."],
+    ["Traduza: 'Eu já comi' (present perfect)",["i have eaten","i have already eaten"],"HAVE + particípio","I have already eaten, thanks."],
+    ["Traduza: 'Ela estava dormindo'",["she was sleeping"],"Passado contínuo: was + ING","She was sleeping at noon."],
+    ["Passado de BUY",["bought"],"buy → bought (irregular)","I bought a new phone."],
+    ["Passado de THINK",["thought"],"think → thought","I thought about you."],
+    ["Traduza: 'Nós tínhamos estudado'",["we had studied"],"Past perfect: HAD + particípio","We had studied before the test."],
+    ["Traduza: 'Vai chover' (going to)",["it is going to rain"],"GOING TO para previsões","Look at the sky! It is going to rain."],
+  ];
+  for(const [p,ans,note,ex] of t4)
+    add(4,p,ans,`Resposta: ${ans[0]}`,`Ex.: "${cap(ex)}"`,note);
+
+  /* ---- TIER 5: perguntas completas ---- */
+  const t5 = [
+    ["Onde você mora?",["where do you live"],"WHERE + DO + sujeito + verbo."],
+    ["O que você faz? (profissão)",["what do you do"],"'What do you do?' pergunta a profissão."],
+    ["Quanto custa isso?",["how much is it","how much does it cost","how much is this"],"HOW MUCH para preço."],
+    ["Que horas são?",["what time is it"],"Pergunta clássica de horas."],
+    ["Você já esteve no Brasil?",["have you ever been to brazil"],"Present perfect + EVER = 'já... alguma vez'."],
+    ["Por que você está atrasado?",["why are you late"],"WHY + TO BE + sujeito + adjetivo."],
+    ["Com que frequência você treina?",["how often do you train","how often do you work out","how often do you exercise"],"HOW OFTEN = com que frequência."],
+    ["Quanto tempo leva?",["how long does it take"],"HOW LONG + TAKE para duração."],
+  ];
+  for(const [pt,ans,note] of t5)
+    add(5,`Pergunte em inglês: "${pt}"`,ans,`${pt} = ${ans[0]}?`,`Ex.: "${cap(ans[0])}?"`,note);
+
+  /* ---- TIER 6: phrasal verbs ---- */
+  const t6 = [
+    ["desistir",["give up"],"GIVE UP = desistir","Never give up!"],
+    ["descobrir",["find out"],"FIND OUT = descobrir (informação)","I need to find out the truth."],
+    ["cuidar de",["take care of","look after"],"TAKE CARE OF / LOOK AFTER","She takes care of her brother."],
+    ["continuar",["keep going","go on","carry on","keep on"],"KEEP GOING / GO ON = continuar","Keep going, you are almost there!"],
+    ["procurar",["look for"],"LOOK FOR = procurar","I am looking for my keys."],
+    ["adiar",["put off"],"PUT OFF = adiar","Do not put off your homework."],
+    ["vestir (roupa)",["put on"],"PUT ON = vestir/colocar","Put on your jacket."],
+    ["tirar (roupa)",["take off"],"TAKE OFF = tirar (e decolar!)","Take off your shoes, please."],
+    ["acordar",["wake up"],"WAKE UP = acordar","I wake up at six."],
+    ["desligar",["turn off"],"TURN OFF = desligar","Turn off the lights."],
+    ["ligar (aparelho)",["turn on"],"TURN ON = ligar","Turn on the TV."],
+    ["encontrar por acaso",["run into","bump into"],"RUN INTO = topar com alguém","I ran into an old friend."],
+  ];
+  for(const [pt,ans,note,ex] of t6)
+    add(6,`Phrasal verb para "${pt}":`,ans,`${pt} = ${ans[0]}`,`Ex.: "${ex}"`,note);
+
+  /* ---- TIER 7: expressões idiomáticas ---- */
+  const t7 = [
+    ["Está chovendo canivetes (chovendo MUITO)",["it is raining cats and dogs"],"Idiom clássico para chuva forte."],
+    ["De vez em quando",["once in a while","from time to time"],"ONCE IN A WHILE = de vez em quando."],
+    ["Custou o olho da cara",["it cost an arm and a leg"],"AN ARM AND A LEG = caríssimo."],
+    ["Melhor prevenir do que remediar",["better safe than sorry"],"Expressão fixa, sem tradução literal."],
+    ["Estou sem grana / duro",["i am broke"],"BROKE (adjetivo) = sem dinheiro."],
+    ["Boa sorte! (no teatro: 'quebre a perna')",["break a leg"],"BREAK A LEG = boa sorte."],
+    ["Moleza / muito fácil",["piece of cake","a piece of cake"],"PIECE OF CAKE = facílimo."],
+    ["Estou esgotado / exausto",["i am worn out","i am exhausted","i am beat"],"WORN OUT = desgastado, exausto."],
+    ["Faz sentido",["it makes sense","that makes sense"],"MAKE SENSE = fazer sentido."],
+    ["Estar em cima do muro (indeciso)",["on the fence","to be on the fence","i am on the fence"],"ON THE FENCE = indeciso."],
+  ];
+  for(const [pt,ans,note] of t7)
+    add(7,`Expressão em inglês: "${pt}"`,ans,`${pt} = ${ans[0]}`,`Ex.: "${cap(ans[0])}."`,note);
+
+  /* ---- TIER 8: diálogos ---- */
+  const t8 = [
+    ["A: How are you?","Responda: 'Estou bem, obrigado. E você?'",
+      ["i am fine thank you and you","i am good thanks and you","i am fine thanks and you","i am fine thank you how about you"],
+      "Resposta padrão + devolver a pergunta com AND YOU?"],
+    ["A: Would you like some coffee?","Recuse educadamente: 'Não, obrigado. Estou bem.'",
+      ["no thank you i am fine","no thanks i am fine","no thank you i am ok","no thanks i am good"],
+      "Recusa educada: NO, THANK YOU + I'M FINE."],
+    ["A: What did you do last weekend?","Responda: 'Fiquei em casa e assisti filmes.'",
+      ["i stayed home and watched movies","i stayed at home and watched movies"],
+      "Passado: stayed / watched."],
+    ["A: Can I help you? (numa loja)","Responda: 'Estou só olhando, obrigado.'",
+      ["i am just looking thanks","i am just looking thank you","just looking thanks","just looking thank you"],
+      "JUST LOOKING = só olhando (frase de loja)."],
+    ["A: How was your trip?","Responda: 'Foi incrível, me diverti muito.'",
+      ["it was amazing i had a lot of fun","it was amazing i had so much fun","it was great i had a lot of fun"],
+      "HAVE FUN = divertir-se → passado: HAD FUN."],
+    ["A: Are you free tomorrow?","Responda: 'Desculpe, tenho que trabalhar.'",
+      ["sorry i have to work","i am sorry i have to work"],
+      "HAVE TO = ter que (obrigação)."],
+  ];
+  for(const [ctx,p,ans,note] of t8)
+    add(8,`${ctx}|||${p}`,ans,`Resposta: ${ans[0]}`,`Ex.: "${cap(ans[0])}."`,note);
+
+  /* ---- TIER 9: textos curtos ---- */
+  const t9 = [
+    ["Ontem eu acordei cedo. Depois fui trabalhar de ônibus.",
+      ["yesterday i woke up early then i went to work by bus","yesterday i woke up early after that i went to work by bus"],
+      "WOKE UP (passado) + BY BUS = de ônibus."],
+    ["Minha cidade é pequena, mas muito bonita. As pessoas são gentis.",
+      ["my city is small but very beautiful the people are kind","my town is small but very beautiful the people are kind","my city is small but very pretty the people are kind"],
+      "BUT = mas. THE PEOPLE ARE (plural)."],
+    ["Eu estudo inglês porque quero viajar pelo mundo.",
+      ["i study english because i want to travel around the world","i study english because i want to travel the world"],
+      "BECAUSE = porque. AROUND THE WORLD = pelo mundo."],
+    ["Se eu tivesse mais tempo, eu leria mais livros.",
+      ["if i had more time i would read more books"],
+      "2ª condicional: IF + passado, WOULD + verbo."],
+    ["Ela tem trabalhado muito ultimamente e precisa descansar.",
+      ["she has been working a lot lately and needs to rest","she has been working hard lately and needs to rest","she has been working too much lately and needs to rest"],
+      "Present perfect contínuo: HAS BEEN + ING. LATELY = ultimamente."],
+  ];
+  for(const [pt,ans,note] of t9)
+    add(9,`Traduza o texto: "${pt}"`,ans,`= ${ans[0]}`,`Ex.: "${cap(ans[0])}."`,note);
+
+  return Q;
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+const QDB = buildQuestions();
+const MAX_TIER = 9;
+const TIER_NAMES = ["","Palavras","Frases curtas","Frases médias","Tempos verbais",
+  "Perguntas","Phrasal verbs","Expressões","Diálogos","Textos"];
+
+/* ============================================================
+   ENGQUEST — GAME LOGIC
+   Módulos: Sfx | Meta (persistência) | Scorer | Srs | Quiz
+            Gacha | Run | Combat | UI
+   ============================================================ */
+"use strict";
+
+/* ================= SFX (WebAudio, sem assets) ================= */
+const Sfx = {
+  ctx:null,
+  ensure(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(this.ctx&&this.ctx.state==="suspended") this.ctx.resume(); },
+  tone(f,dur,type,delay,vol){
+    if(!this.ctx) return;
+    const t=this.ctx.currentTime+(delay||0);
+    const o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type||"square"; o.frequency.value=f;
+    g.gain.setValueAtTime(vol||0.06,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t+dur);
+  },
+  seq(notes,step,type,vol){ this.ensure(); notes.forEach((f,i)=>this.tone(f,step*1.6,type,i*step,vol)); },
+  ok(){ this.seq([523,659,784],0.09); },
+  partial(){ this.seq([440,554],0.1); },
+  bad(){ this.ensure(); this.tone(196,0.25,"sawtooth",0,0.05); this.tone(147,0.3,"sawtooth",0.12,0.05); },
+  coin(){ this.ensure(); this.tone(1175,0.06,"square",0,0.04); this.tone(1568,0.12,"square",0.06,0.04); },
+  hit(){ this.ensure(); this.tone(98,0.08,"sawtooth",0,0.07); },
+  pack(){ this.seq([294,392,494,587],0.07,"triangle"); },
+  drop(r){ const a=[[523,659],[523,659,784],[523,659,784,1046],[392,523,659,784,1046],[392,523,659,784,1046,1318,1568]][r]||[523];
+    this.seq(a,0.11,"triangle",0.07); },
+  levelup(){ this.seq([392,523,659,784],0.1,"triangle"); },
+};
+
+/* ================= META (stats permanentes) =================
+   Persistidas via window.storage — sobrevivem entre Runs/sessões. */
+const Meta = {
+  d:{ bestFloor:0, bestCombo:0, correct:0, answered:0, packs:0,
+      learned:{}, srs:{}, runs:0 },
+  async load(){
+    try{ const r=await window.storage.get("engquest-meta");
+      if(r&&r.value) this.d=Object.assign(this.d,JSON.parse(r.value));
+    }catch(e){ /* primeira vez: chave não existe */ }
+  },
+  save(){ try{ window.storage.set("engquest-meta",JSON.stringify(this.d)); }catch(e){} },
+  learnedCount(){ let n=0; for(const k in this.d.learned) if(this.d.learned[k]>=CFG.learnedAfter) n++; return n; },
+  acc(){ return this.d.answered? Math.round(100*this.d.correct/this.d.answered):0; },
+};
+
+/* ================= SCORER (acerto parcial) ================= */
+const CONTR = {"i'm":"i am","you're":"you are","he's":"he is","she's":"she is","it's":"it is",
+"we're":"we are","they're":"they are","don't":"do not","doesn't":"does not","didn't":"did not",
+"can't":"can not","cannot":"can not","won't":"will not","isn't":"is not","aren't":"are not",
+"wasn't":"was not","weren't":"were not","i've":"i have","you've":"you have","we've":"we have",
+"they've":"they have","i'll":"i will","you'll":"you will","he'll":"he will","she'll":"she will",
+"we'll":"we will","they'll":"they will","i'd":"i would","that's":"that is","what's":"what is",
+"let's":"let us","o'clock":"o clock"};
+const Scorer = {
+  norm(s){
+    s=(s||"").toLowerCase().replace(/’/g,"'").trim();
+    s=s.split(/\s+/).map(w=>CONTR[w]||w).join(" ");
+    return s.replace(/[^a-z0-9' ]+/g," ").replace(/'/g,"").replace(/\s+/g," ").trim();
+  },
+  lev(a,b){
+    const m=a.length,n=b.length,d=[];
+    for(let i=0;i<=m;i++)d[i]=[i];
+    for(let j=0;j<=n;j++)d[0][j]=j;
+    for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
+      d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+    return d[m][n];
+  },
+  /* Retorna {score 0..1, ans, matched[], missing[], extra[]} */
+  evaluate(given,q){
+    const g=this.norm(given);
+    let best={score:0,ans:q.a[0],matched:[],missing:this.norm(q.a[0]).split(" "),extra:[]};
+    for(const raw of q.a){
+      const A=this.norm(raw);
+      if(g===A) return {score:1,ans:raw,matched:A.split(" "),missing:[],extra:[]};
+      const gt=g? g.split(" "):[], at=A.split(" ");
+      // tolerância a typo em resposta de 1 palavra
+      if(at.length===1&&gt.length===1&&this.lev(gt[0],at[0])<=1&&at[0].length>3){
+        if(0.7>best.score) best={score:0.7,ans:raw,matched:[],missing:at,extra:gt};
+        continue;
+      }
+      const pool=[...gt]; const matched=[],missing=[];
+      for(const w of at){
+        let i=pool.indexOf(w);
+        if(i<0){ // typo leve em palavras longas conta meio ponto via matched? conta como match fraco
+          i=pool.findIndex(p=>p.length>3&&w.length>3&&this.lev(p,w)<=1);
+        }
+        if(i>=0){ matched.push(w); pool.splice(i,1); } else missing.push(w);
+      }
+      const extra=pool;
+      const s=at.length? matched.length/Math.max(at.length,gt.length||1):0;
+      if(s>best.score) best={score:s,ans:raw,matched,missing,extra};
+    }
+    return best;
+  },
+};
+
+/* ================= SRS (repetição espaçada) ================= */
+const Srs = {
+  due(){ // primeira pergunta errada que já "venceu"
+    for(const id in Meta.d.srs) if(Meta.d.srs[id].due<=Meta.d.answered) return id;
+    return null;
+  },
+  wrong(id){
+    const e=Meta.d.srs[id]||{g:0};
+    e.g=0; e.due=Meta.d.answered+CFG.srs.gaps[0];
+    Meta.d.srs[id]=e;
+  },
+  right(id){
+    const e=Meta.d.srs[id]; if(!e) return;
+    e.g++;
+    if(e.g>=CFG.srs.gaps.length) delete Meta.d.srs[id];
+    else e.due=Meta.d.answered+CFG.srs.gaps[e.g];
+  },
+};
+
+/* ================= QUIZ ================= */
+const Quiz = {
+  recent:[],
+  tierForFloor(f){ return Math.min(MAX_TIER, Math.ceil(f/2)); },
+  pick(tier,noSrs){
+    if(!noSrs){
+      const dueId=Srs.due();
+      if(dueId){ const q=QDB.find(x=>x.id===dueId); if(q) return {q,review:true}; }
+    }
+    let pool=QDB.filter(q=>q.tier===tier&&!this.recent.includes(q.id));
+    if(!pool.length) pool=QDB.filter(q=>q.tier===tier);
+    const q=pool[Math.floor(Math.random()*pool.length)];
+    this.recent.push(q.id); if(this.recent.length>8) this.recent.shift();
+    return {q,review:false};
+  },
+  registerResult(q,full,partial){
+    Meta.d.answered++;
+    if(full){
+      Meta.d.correct++;
+      Meta.d.learned[q.id]=(Meta.d.learned[q.id]||0)+1;
+      Srs.right(q.id);
+    } else if(!partial){
+      Srs.wrong(q.id);
+    } else {
+      Meta.d.correct+=0; // parcial não conta como acerto pleno nas stats
+      Srs.wrong(q.id);   // volta para revisão até dominar
+    }
+  },
+};
+
+/* ================= GACHA ================= */
+const Gacha = {
+  packIdxForTier(tier,partial){
+    let i=PACK_BY_TIER[tier]||0;
+    if(partial) i=Math.max(0,i-1);        // acerto parcial = pacote inferior
+    // bônus de combo
+    for(const c of CFG.combo) if(Run.combo>=c.at&&c.minPack!=null) i=Math.max(i,c.minPack);
+    return i;
+  },
+  rollRarity(packIdx){
+    const odds=[...PACKS[packIdx].odds];
+    let bonus=0;
+    for(const c of CFG.combo) if(Run.combo>=c.at&&c.rareBonus) bonus=c.rareBonus;
+    if(bonus&&odds[0]>0){ const mv=Math.min(bonus,odds[0]); odds[0]-=mv; odds[1]+=mv; }
+    let r=Math.random()*100;
+    for(let i=0;i<odds.length;i++){ if(r<odds[i]) return i; r-=odds[i]; }
+    return odds.length-1;
+  },
+  makeItem(rarIdx){
+    const t=ITEM_TYPES[Math.floor(Math.random()*ITEM_TYPES.length)];
+    const R=RARITIES[rarIdx];
+    const fscale=1+Run.floor*0.06;
+    const jitter=()=>0.85+Math.random()*0.3;
+    const hp=Math.round(t.hp*R.mult*fscale*jitter());
+    const dmg=Math.round(t.dmg*R.mult*fscale*jitter());
+    const mats=MATERIAL[R.key];
+    return { name:`${t.nome} ${mats[Math.floor(Math.random()*mats.length)]}`,
+      type:t, slot:t.slot, rar:rarIdx, hp, dmg, sell:R.sell };
+  },
+};
+
+/* ================= RUN (estado da partida) ================= */
+const Run = {
+  active:false, floor:1, gold:0, xp:0, level:1, combo:0, maxCombo:0,
+  hp:0, crit:0, reviveUsed:false, equip:{}, packsOpened:0,
+  enemy:null, pendingPack:null, currentQ:null, isReview:false,
+  battleTimer:null, inCombat:false, answering:false, goldEarned:0,
+  reset(){
+    this.active=true; this.floor=1; this.gold=0; this.xp=0; this.level=1;
+    this.combo=0; this.maxCombo=0; this.crit=0; this.reviveUsed=false;
+    this.equip={}; this.packsOpened=0; this.goldEarned=0;
+    this.pendingPack=null; this.currentQ=null; Quiz.recent=[];
+    if(this.battleTimer){ clearInterval(this.battleTimer); this.battleTimer=null; }
+    this.inCombat=false; this.answering=false;
+    this.hp=this.maxHp();
+  },
+  bonus(){ let hp=0,dmg=0; for(const s of SLOTS){ const it=this.equip[s]; if(it){hp+=it.hp; dmg+=it.dmg;} } return {hp,dmg}; },
+  maxHp(){ return CFG.player.baseHp+(this.level-1)*CFG.level.hpPerLevel+this.bonus().hp; },
+  dmg(){ return CFG.player.baseDmg+(this.level-1)*CFG.level.dmgPerLevel+this.bonus().dmg; },
+  addXp(n){
+    this.xp+=n;
+    while(this.xp>=this.level*CFG.level.xpPerLevel){
+      this.xp-=this.level*CFG.level.xpPerLevel; this.level++;
+      this.hp=Math.min(this.maxHp(),this.hp+10);
+      Sfx.levelup(); UI.toast(`⬆️ LEVEL ${this.level}! +${CFG.level.hpPerLevel} HP, +${CFG.level.dmgPerLevel} DMG`);
+    }
+  },
+  addGold(n){ this.gold+=n; if(n>0) this.goldEarned+=n; },
+};
+
+/* ================= COMBAT ================= */
+const Combat = {
+  enemyFor(f){
+    const boss=f%CFG.enemy.bossEvery===0;
+    const base=boss? BOSS: ENEMIES[(Math.ceil(f/1)-1)%ENEMIES.length];
+    const mult=boss? CFG.enemy.bossMult:1;
+    return { name:boss? `👑 ${base.name}`:base.name, spr:base.spr, pal:base.pal, boss,
+      maxHp:Math.round(CFG.enemy.hp(f)*mult), hp:Math.round(CFG.enemy.hp(f)*mult),
+      dmg:Math.round(CFG.enemy.dmg(f)*(boss?1.25:1)) };
+  },
+  stop(){ if(Run.battleTimer){ clearInterval(Run.battleTimer); Run.battleTimer=null; } Run.inCombat=false; },
+  start(){
+    // Guarda anti-duplicação: nunca deixa dois timers de combate rodando ao mesmo
+    // tempo (double-tap em botões criava um "timer fantasma" que pulava fases).
+    this.stop();
+    Run.inCombat=true;
+    UI.setBattleUi(true);
+    let heroTurn=true;
+    Run.battleTimer=setInterval(()=>{
+      if(!Run.active||!Run.inCombat){ this.stop(); return; }
+      if(heroTurn){
+        const crit=Math.random()<Run.crit;
+        const d=Math.round(Run.dmg()*(crit?2:1));
+        Run.enemy.hp=Math.max(0,Run.enemy.hp-d);
+        UI.hitFx("enemy",d,crit); Sfx.hit();
+        if(Run.enemy.hp<=0){ this.stop(); setTimeout(()=>Game.floorClear(),500); return; }
+      } else {
+        Run.hp=Math.max(0,Run.hp-Run.enemy.dmg);
+        UI.hitFx("hero",Run.enemy.dmg,false); Sfx.hit();
+        if(Run.hp<=0){ this.stop(); setTimeout(()=>Game.playerDown(),500); return; }
+      }
+      heroTurn=!heroTurn; UI.refreshBars();
+    },420);
+  },
+};
+
+/* ================= UI ================= */
+const $=(id)=>document.getElementById(id);
+const UI = {
+  drawSprite(cv,rows,pal,scale){
+    const w=rows[0].length,h=rows.length;
+    cv.width=w*scale; cv.height=h*scale;
+    const c=cv.getContext("2d");
+    c.clearRect(0,0,cv.width,cv.height);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      const ch=rows[y][x]; if(ch==="."||!pal[ch]) continue;
+      c.fillStyle=pal[ch]; c.fillRect(x*scale,y*scale,scale,scale);
+    }
+  },
+  itemPal(rarIdx){
+    const col=getComputedStyle(document.documentElement).getPropertyValue("--r-"+RARITIES[rarIdx].key).trim();
+    return { o:"#0a0816","1":col,"2":"#8a5a2b","3":"#fff0b0" };
+  },
+  show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on")); $(id).classList.add("on"); },
+  modal(html){ $("modal").innerHTML=html; $("ovl").classList.add("on"); },
+  closeModal(){ $("ovl").classList.remove("on"); },
+  // Vincula um clique de disparo ÚNICO: mesmo com double-tap (comum no celular),
+  // o handler roda só uma vez e o botão fica travado, evitando ações duplicadas.
+  once(el,fn){
+    if(!el) return;
+    el.onclick=(e)=>{ if(el.dataset.fired) return; el.dataset.fired="1"; el.style.pointerEvents="none"; fn(e); };
+  },
+  toast(msg,ms){
+    const t=$("toast"); t.textContent=msg; t.classList.remove("on");
+    void t.offsetWidth; t.classList.add("on");
+    clearTimeout(this._tt); this._tt=setTimeout(()=>t.classList.remove("on"),ms||1800);
+  },
+  refreshHud(){
+    $("chip-floor").innerHTML=`🏰 <b>Andar ${Run.floor}</b>`;
+    $("chip-gold").innerHTML=`🪙 <b>${Run.gold}</b>`;
+    $("chip-xp").innerHTML=`⭐ <b>LV ${Run.level}</b> <span style="color:var(--ink-dim)">${Run.xp}/${Run.level*CFG.level.xpPerLevel}</span>`;
+    const chipC=$("chip-combo");
+    chipC.innerHTML=`🔥 <b>x${Run.combo}</b>`;
+    chipC.classList.toggle("hot",Run.combo>=5);
+    for(const k of ["heal","pack","crit"]) $("shop-"+k).disabled=Run.gold<CFG.shop[k].cost;
+  },
+  refreshBars(){
+    const hMax=Run.maxHp();
+    $("hero-hp-i").style.width=Math.max(0,100*Run.hp/hMax)+"%";
+    $("hero-hp-t").textContent=`${Run.hp}/${hMax}`;
+    if(Run.enemy){
+      $("enemy-hp-i").style.width=Math.max(0,100*Run.enemy.hp/Run.enemy.maxHp)+"%";
+      $("enemy-hp-t").textContent=`${Run.enemy.hp}/${Run.enemy.maxHp}`;
+    }
+  },
+  renderArena(){
+    this.drawSprite($("hero-cv"),SPR.hero,HERO_PAL,Run.enemy&&Run.enemy.boss?6:7);
+    this.drawSprite($("enemy-cv"),SPR[Run.enemy.spr],Run.enemy.pal,Run.enemy.boss?9:7);
+    $("enemy-name").textContent=Run.enemy.name;
+    $("hero-name").textContent=`Herói · ⚔️${Run.dmg()}${Run.crit?` · 💥${Math.round(Run.crit*100)}%`:""}`;
+    $("boss-tag").style.display=Run.enemy.boss?"block":"none";
+    this.refreshBars();
+  },
+  hitFx(side,dmg,crit){
+    const f=document.querySelector(".fighter."+side);
+    const cv=f.querySelector("canvas");
+    cv.classList.remove("hitflash"); void cv.offsetWidth; cv.classList.add("hitflash");
+    const el=document.createElement("div");
+    el.className="dmgfloat"; el.textContent=(crit?"💥":"-")+dmg;
+    el.style.color=crit?"var(--gold)":(side==="hero"?"var(--hp)":"#fff");
+    el.style.left=(f.offsetLeft+40+Math.random()*30)+"px";
+    el.style.top=(f.offsetTop+10)+"px";
+    $("arena").appendChild(el); setTimeout(()=>el.remove(),850);
+  },
+  setBattleUi(on){
+    $("qarea").innerHTML=on? `<div class="qcard pxbox" style="text-align:center; color:var(--ink-dim); font-size:9px;">⚔️ Combate automático em andamento...</div>`:"";
+    $("shop").style.display=on?"none":"flex";
+  },
+  particles(n,colors){
+    const app=$("app");
+    for(let i=0;i<n;i++){
+      const p=document.createElement("div"); p.className="part";
+      p.style.background=colors[i%colors.length];
+      p.style.left="50%"; p.style.top="45%";
+      p.style.setProperty("--dx",(Math.random()*360-180)+"px");
+      p.style.setProperty("--dy",(Math.random()*360-220)+"px");
+      app.appendChild(p); setTimeout(()=>p.remove(),950);
+    }
+  },
+  flash(){ const f=$("flash"); f.classList.remove("go"); void f.offsetWidth; f.classList.add("go"); },
+  quake(){ const a=$("app"); a.classList.remove("quake"); void a.offsetWidth; a.classList.add("quake"); },
+};
+
+/* ================= GAME FLOW ================= */
+const Game = {
+  async init(){
+    await Meta.load();
+    this.renderTitle();
+    $("btn-start").onclick=()=>{ Sfx.ensure(); this.startRun(); };
+    $("btn-inv").onclick=()=>this.showInventory();
+    $("shop-heal").onclick=()=>this.buy("heal");
+    $("shop-pack").onclick=()=>this.buy("pack");
+    $("shop-crit").onclick=()=>this.buy("crit");
+    $("btn-again").onclick=()=>this.startRun();
+    $("btn-title").onclick=()=>{ this.renderTitle(); UI.show("scr-title"); };
+    UI.show("scr-title");
+  },
+  renderTitle(){
+    $("meta-stats").innerHTML=`
+      <h3>📜 REGISTROS DO AVENTUREIRO</h3>
+      <div class="row"><span>Maior andar</span><b>${Meta.d.bestFloor}</b></div>
+      <div class="row"><span>Maior combo</span><b>x${Meta.d.bestCombo}</b></div>
+      <div class="row"><span>Palavras aprendidas</span><b>${Meta.learnedCount()}</b></div>
+      <div class="row"><span>Respostas corretas</span><b>${Meta.d.correct}</b></div>
+      <div class="row"><span>Pacotes abertos</span><b>${Meta.d.packs}</b></div>
+      <div class="row"><span>Precisão geral</span><b>${Meta.acc()}%</b></div>
+      <div class="row"><span>Runs jogadas</span><b>${Meta.d.runs}</b></div>`;
+  },
+  startRun(){
+    Run.reset(); Meta.d.runs++; Meta.save();
+    UI.closeModal(); UI.show("scr-game");
+    this.startFloor();
+  },
+  startFloor(){
+    Run.enemy=Combat.enemyFor(Run.floor);
+    UI.renderArena(); UI.refreshHud();
+    if(Run.enemy.boss){ UI.toast("⚠️ BOSS! Sua build vai aguentar?",2200); Sfx.bad(); }
+    this.askQuestion();
+  },
+  askQuestion(){
+    const tier=Quiz.tierForFloor(Run.floor);
+    const {q,review}=Quiz.pick(tier);
+    Run.currentQ=q; Run.isReview=review;
+    let ptext=q.p, dialog="";
+    if(q.p.includes("|||")){ const parts=q.p.split("|||"); dialog=`<span class="dialog">💬 ${parts[0]}</span>`; ptext=parts[1]; }
+    $("qarea").innerHTML=`
+      <div class="qcard pxbox">
+        <div class="qtier"><span>TIER ${q.tier} · ${TIER_NAMES[q.tier].toUpperCase()}</span>
+          ${review?`<span class="rev">🔁 REVISÃO</span>`:""}</div>
+        <div class="qtext">${dialog}${ptext}</div>
+        <input id="answer" type="text" autocomplete="off" autocapitalize="off" placeholder="Digite em inglês...">
+        <div class="qactions"><button class="btn" id="btn-send">RESPONDER ⚡</button></div>
+      </div>`;
+    $("shop").style.display="flex";
+    Run.answering=true;
+    $("btn-send").onclick=()=>this.submit();
+    $("answer").addEventListener("keydown",e=>{ if(e.key==="Enter") this.submit(); });
+    UI.refreshHud();
+  },
+  submit(){
+    if(!Run.answering) return;              // trava re-submissão (Enter repetido / double-tap)
+    const given=$("answer").value;
+    if(!given.trim()){ UI.toast("Digite uma resposta!"); return; }
+    Run.answering=false;
+    const sendBtn=$("btn-send"); if(sendBtn) sendBtn.style.pointerEvents="none";
+    const q=Run.currentQ;
+    const r=Scorer.evaluate(given,q);
+    const full=r.score>=CFG.score.full, partial=!full&&r.score>=CFG.score.partial;
+    const tier=q.tier;
+    Quiz.registerResult(q,full,partial);
+
+    let xp=0,gold=0;
+    if(full){
+      Run.combo++; Run.maxCombo=Math.max(Run.maxCombo,Run.combo);
+      const m=CFG.combo.find(c=>c.at===Run.combo);
+      if(m) UI.toast(`🔥 COMBO x${Run.combo}! ${m.txt}`,2200);
+      xp=CFG.reward.xp(tier); gold=CFG.reward.gold(tier);
+      Run.hp=Math.min(Run.maxHp(),Run.hp+Math.round(Run.maxHp()*CFG.player.healOnCorrect));
+      Run.pendingPack=Gacha.packIdxForTier(tier,false);
+      Sfx.ok(); Sfx.coin();
+    } else if(partial){
+      xp=Math.round(CFG.reward.xp(tier)*CFG.reward.partialMult);
+      gold=Math.round(CFG.reward.gold(tier)*CFG.reward.partialMult);
+      Run.pendingPack=Gacha.packIdxForTier(tier,true);
+      Sfx.partial();
+    } else {
+      Run.combo=0; Run.pendingPack=null; Sfx.bad();
+    }
+    Run.addXp(xp); Run.addGold(gold);
+    if(Run.isReview&&full) UI.toast("🧠 Palavra revisada com sucesso!");
+    UI.refreshHud(); UI.refreshBars();
+    this.showFeedback(r,full,partial,xp,gold,q);
+  },
+  showFeedback(r,full,partial,xp,gold,q){
+    const pct=Math.round(r.score*100);
+    const cls=full?"ok":partial?"partial":"bad";
+    const head=full?"✅ PERFEITO!":partial?"⚠️ QUASE LÁ!":"❌ ERROU!";
+    const wordDiff=r.missing.length?
+      `<div class="line">❌ Faltou/errou: ${r.missing.map(w=>`<span class="wordmiss">${w}</span>`).join(" · ")}</div>`:"";
+    const extras=r.extra.length?
+      `<div class="line">✂️ Sobrou: ${r.extra.map(w=>`<span class="wordbad">${w}</span>`).join(" · ")}</div>`:"";
+    const okWords=partial&&r.matched.length?
+      `<div class="line">👍 Você acertou: ${r.matched.map(w=>`<span class="wordok">${w}</span>`).join(" · ")}</div>`:"";
+    const rew=(full||partial)?
+      `<div class="rewards"><span>⭐ +${xp} XP</span><span>🪙 +${gold}</span><span>📦 ${PACKS[Run.pendingPack].name}${partial?" (inferior)":""}</span></div>`:
+      `<div class="rewards"><span style="color:var(--bad)">Sem pacote desta vez... 📦❌</span></div>`;
+    $("qarea").innerHTML=`
+      <div class="fb pxbox ${cls}">
+        <div class="head">${head}</div>
+        <div class="pct" style="color:var(--${cls==="ok"?"ok":cls==="partial"?"warn":"bad"})">${pct}%</div>
+        <div class="line">✅ Resposta correta: <b>${r.ans}</b></div>
+        ${okWords}${wordDiff}${extras}
+        <div class="line">📖 ${q.note}</div>
+        <div class="line">💡 ${q.tr}</div>
+        <div class="line">🔁 ${q.ex}</div>
+        ${rew}
+        <div class="qactions"><button class="btn blue" id="btn-cont">CONTINUAR ▶</button></div>
+      </div>`;
+    $("shop").style.display="none";
+    UI.once($("btn-cont"),()=>{
+      if(Run.pendingPack!=null){ const p=Run.pendingPack; Run.pendingPack=null; this.openPack(p,()=>Combat.start()); }
+      else Combat.start();
+    });
+  },
+  /* ---------- GACHA / PACOTES ---------- */
+  openPack(packIdx,onDone){
+    const P=PACKS[packIdx];
+    Sfx.pack();
+    UI.modal(`
+      <div class="packwrap">
+        <div class="packname" style="color:${P.col}">${P.name.toUpperCase()}</div>
+        <div class="pack" id="packbtn" style="--pc:${P.col};--pcl:${P.col}cc;--pcd:#0a0816"><span>❓</span></div>
+        <div class="packhint">👆 Toque para abrir!</div>
+      </div>`);
+    UI.once($("packbtn"),()=>{
+      $("packbtn").classList.add("opening");
+      setTimeout(()=>{
+        Run.packsOpened++; Meta.d.packs++;
+        const rar=Gacha.rollRarity(packIdx);
+        const item=Gacha.makeItem(rar);
+        this.showItem(item,packIdx,onDone);
+      },420);
+    });
+  },
+  showItem(item,packIdx,onDone){
+    const R=RARITIES[item.rar];
+    Sfx.drop(item.rar);
+    if(item.rar===4){ UI.flash(); UI.quake(); UI.particles(34,["#ff4dd8","#5ad4ff","#ffc93c","#b478ff","#fff"]); }
+    else if(item.rar===3){ UI.particles(18,["#ffc93c","#fff0b0"]); }
+    else if(item.rar===2){ UI.particles(10,["#b478ff"]); }
+    const cur=Run.equip[item.slot];
+    const dHp=item.hp-(cur?cur.hp:0), dDmg=item.dmg-(cur?cur.dmg:0);
+    const arrow=(v)=>v>0?`<span class="up">▲+${v}</span>`:v<0?`<span class="down">▼${v}</span>`:`<span class="eq">=</span>`;
+    UI.modal(`
+      <div class="itemcard pxbox ${item.rar===4?"mistico":""}">
+        <div class="rar r-${R.key}">${item.rar===4?"🌟 ":""}${R.name}${item.rar===4?" 🌟":""}</div>
+        <canvas id="item-cv"></canvas>
+        <div class="iname r-${R.key}">${item.name}</div>
+        <div class="istats"><span>❤️ <b>+${item.hp}</b></span><span>⚔️ <b>+${item.dmg}</b></span></div>
+        <div class="cmp">vs equipado (${item.slot}): ❤️${arrow(dHp)} ⚔️${arrow(dDmg)}</div>
+      </div>
+      <div class="qactions" style="justify-content:center; margin-top:8px;">
+        <button class="btn" id="it-eq">EQUIPAR</button>
+        <button class="btn ghost small" id="it-sell">VENDER +${item.sell}🪙</button>
+        <button class="btn ghost small" id="it-rr">🎲 ${CFG.shop.reroll.label} ${CFG.shop.reroll.cost}🪙</button>
+      </div>`);
+    UI.drawSprite($("item-cv"),SPR[item.type.sprite],UI.itemPal(item.rar),7);
+    UI.once($("it-eq"),()=>{
+      const old=Run.equip[item.slot];
+      Run.equip[item.slot]=item;
+      Run.hp=Math.min(Run.maxHp(),Run.hp+Math.max(0,item.hp-(old?old.hp:0)));
+      if(old) Run.addGold(Math.floor(old.sell/2));
+      UI.toast(`Equipado! ${old?`(antigo vendido +${Math.floor(old.sell/2)}🪙)`:""}`);
+      this.afterItem(onDone);
+    });
+    UI.once($("it-sell"),()=>{ Run.addGold(item.sell); Sfx.coin(); this.afterItem(onDone); });
+    const rr=$("it-rr");
+    if(Run.gold<CFG.shop.reroll.cost) rr.disabled=true;
+    // Rerolar reconstrói o card (com novos botões), então não é disparo único:
+    rr.onclick=()=>{ if(rr.disabled) return; Run.addGold(-CFG.shop.reroll.cost);
+      const rar=Gacha.rollRarity(packIdx); this.showItem(Gacha.makeItem(rar),packIdx,onDone); };
+  },
+  afterItem(onDone){
+    UI.closeModal(); UI.refreshHud(); UI.renderArena();
+    if(onDone) onDone();
+  },
+  /* ---------- LOJA ---------- */
+  buy(k){
+    if($("ovl").classList.contains("on")) return;   // já há um modal aberto (ex.: pacote)
+    const s=CFG.shop[k]; if(Run.gold<s.cost) return;
+    Run.addGold(-s.cost); Sfx.coin();
+    if(k==="heal"){ Run.hp=Math.min(Run.maxHp(),Run.hp+Math.round(Run.maxHp()*0.5)); UI.toast("❤️ +50% HP!"); }
+    if(k==="crit"){ Run.crit=Math.min(0.5,Run.crit+0.1); UI.toast(`💥 Crítico: ${Math.round(Run.crit*100)}%`); UI.renderArena(); }
+    if(k==="pack"){ const idx=Gacha.packIdxForTier(Quiz.tierForFloor(Run.floor),false); this.openPack(idx,null); }
+    UI.refreshHud(); UI.refreshBars();
+  },
+  /* ---------- INVENTÁRIO ---------- */
+  showInventory(){
+    const b=Run.bonus();
+    let grid="";
+    for(const s of SLOTS){
+      const it=Run.equip[s];
+      grid+=it?`
+        <div class="slot pxbox"><canvas id="inv-${s}"></canvas>
+          <div class="sn r-${RARITIES[it.rar].key}">${it.type.nome}</div>
+          <div class="sn">❤️${it.hp} ⚔️${it.dmg}</div></div>`:
+        `<div class="slot pxbox empty"><div style="font-size:16px;margin:12px 0 6px">·</div><div class="sn">${s}</div></div>`;
+    }
+    UI.modal(`
+      <h2>🎒 INVENTÁRIO</h2>
+      <div id="invgrid">${grid}</div>
+      <div class="invtotal"><span>❤️ Bônus: <b style="color:var(--hp2)">+${b.hp}</b></span>
+        <span>⚔️ Bônus: <b style="color:var(--torch)">+${b.dmg}</b></span></div>
+      <div class="qactions" style="justify-content:center; margin-top:12px;">
+        <button class="btn ghost" onclick="UI.closeModal()">FECHAR</button></div>`);
+    for(const s of SLOTS){ const it=Run.equip[s];
+      if(it) UI.drawSprite($("inv-"+s),SPR[it.type.sprite],UI.itemPal(it.rar),4); }
+  },
+  /* ---------- FLUXO DE ANDAR / MORTE ---------- */
+  floorClear(){
+    UI.toast(Run.enemy.boss?"👑 BOSS DERROTADO!!":"✔ Inimigo derrotado!");
+    if(Run.enemy.boss){ Sfx.levelup(); UI.particles(16,["#ffd23c","#fff"]); Run.addGold(30); }
+    Run.floor++;
+    Meta.d.bestFloor=Math.max(Meta.d.bestFloor,Run.floor-1);
+    Meta.d.bestCombo=Math.max(Meta.d.bestCombo,Run.maxCombo);
+    Meta.save();
+    setTimeout(()=>this.startFloor(),700);
+  },
+  playerDown(){
+    if(Run.reviveUsed){ this.gameOver(); return; }
+    Run.reviveUsed=true;
+    const tier=Math.min(MAX_TIER,Quiz.tierForFloor(Run.floor)+2);
+    const {q}=Quiz.pick(tier,true);
+    let ptext=q.p, dialog="";
+    if(q.p.includes("|||")){ const pr=q.p.split("|||"); dialog=`<span class="dialog">💬 ${pr[0]}</span>`; ptext=pr[1]; }
+    UI.modal(`
+      <div class="skullbig">💀</div>
+      <h2 style="color:var(--hp)">VOCÊ CAIU!</h2>
+      <div style="font-size:8px; color:var(--ink-dim); margin-bottom:10px;">
+        Última chance: acerte esta pergunta <b style="color:var(--r-epico)">TIER ${q.tier}</b> para reviver!</div>
+      <div class="qcard pxbox" style="text-align:left;">
+        <div class="qtext">${dialog}${ptext}</div>
+        <input id="rv-answer" type="text" autocomplete="off" autocapitalize="off" placeholder="Resposta perfeita ou fim...">
+        <div class="qactions"><button class="btn" id="rv-send">REVIVER ✨</button></div>
+      </div>`);
+    UI.once($("rv-send"),()=>{
+      const r=Scorer.evaluate($("rv-answer").value,q);
+      Quiz.registerResult(q,r.score>=CFG.score.full,false);
+      if(r.score>=CFG.score.full){
+        Run.hp=Math.round(Run.maxHp()*CFG.player.reviveHp);
+        UI.closeModal(); UI.flash(); Sfx.levelup();
+        UI.toast("✨ REVIVEU COM "+Math.round(CFG.player.reviveHp*100)+"% DE HP!");
+        UI.refreshBars(); Combat.start();
+      } else {
+        UI.closeModal();
+        UI.toast(`A resposta era: "${r.ans}"`,2600);
+        setTimeout(()=>this.gameOver(),1200);
+      }
+    });
+    $("rv-answer").addEventListener("keydown",e=>{ if(e.key==="Enter") $("rv-send").click(); });
+  },
+  gameOver(){
+    Run.active=false;
+    Meta.d.bestFloor=Math.max(Meta.d.bestFloor,Run.floor);
+    Meta.d.bestCombo=Math.max(Meta.d.bestCombo,Run.maxCombo);
+    Meta.save();
+    $("sum-content").innerHTML=`
+      <div class="skullbig">⚰️</div>
+      <h2 style="color:var(--hp); font-size:14px; margin-bottom:14px;">FIM DA RUN</h2>
+      <div class="pxbox" style="padding:14px; text-align:left;">
+        <div class="sumrow"><span>🏰 Andar alcançado</span><b>${Run.floor}</b></div>
+        <div class="sumrow"><span>🔥 Maior combo</span><b>x${Run.maxCombo}</b></div>
+        <div class="sumrow"><span>📦 Pacotes abertos</span><b>${Run.packsOpened}</b></div>
+        <div class="sumrow"><span>🪙 Ouro ganho</span><b>${Run.goldEarned}</b></div>
+        <div class="sumrow"><span>⭐ Nível final</span><b>${Run.level}</b></div>
+      </div>
+      <div class="pxbox" style="padding:14px; text-align:left; margin-top:10px;">
+        <div style="font-size:8px; color:var(--torch); margin-bottom:6px;">📜 RECORDES PERMANENTES</div>
+        <div class="sumrow"><span>Maior andar</span><b>${Meta.d.bestFloor}</b></div>
+        <div class="sumrow"><span>Palavras aprendidas</span><b>${Meta.learnedCount()}</b></div>
+        <div class="sumrow"><span>Precisão geral</span><b>${Meta.acc()}%</b></div>
+      </div>
+      <div style="font-size:8px; color:var(--ink-dim); margin-top:12px;">
+        Equipamentos perdidos... mas o inglês fica com você. 🧠</div>`;
+    UI.show("scr-summary");
+  },
+};
+
+window.addEventListener("DOMContentLoaded",()=>Game.init());
+
+</script>
+</body>
+</html>
